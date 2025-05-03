@@ -1,25 +1,36 @@
-﻿using System;
-
-// ReSharper disable IdentifierTypo
-
-namespace KyodaiBot;
+﻿namespace KyodaiBot;
 
 internal class Program
 {
-    public static int Main(string[] args)
+    public static async Task<int> Main(string[] args) // ← Обязательно async Task<int>
     {
-        var bot = new Bot("7836432946:AAH_Ih50qblFVlsgHLcS6FOCbbcs7YQb1OQ");
-        var watchdog = new Watchdog();
-        
+        string? explicitTgToken = null;
+        string? explicitCocToken = null;
 
-        Console.WriteLine($"@{bot.Me.Username} is running... Press Escape to terminate");
+        string actualTgToken = explicitTgToken ?? Environment.GetEnvironmentVariable("TELEGRAM_API_TOKEN")!;
+        string actualCocToken = explicitCocToken ?? Environment.GetEnvironmentVariable("CLASH_API_TOKEN")!;
+
+        var bot = new Bot(actualTgToken, actualCocToken);
+        var watchdog = new Watchdog();
+
+        Console.WriteLine($"@{bot.Me.Username} is running... Press Ctrl+C to terminate");
+
         watchdog.Start();
 
-        while (Console.ReadKey(true).Key != ConsoleKey.Escape) ;
-        watchdog.Stop();
-        bot.Cts.Cancel();
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            bot.Cts.Cancel();
+        };
 
+        try
+        {
+            await Task.Delay(-1, bot.Cts.Token); // Block indefinitely until cancellation
+        }
+        catch (TaskCanceledException)
+        { } // Ignore
+
+        watchdog.Stop();
         return 0;
     }
 }
-

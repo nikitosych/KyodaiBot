@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using System.Text;
+﻿using System.Text;
 using KyodaiBot.Models;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
@@ -16,6 +15,8 @@ public class Bot
     public readonly User Me;
     public readonly CancellationTokenSource Cts;
     public readonly TelegramBotClient Client;
+
+    private readonly ClashApi _clash;
 
     private readonly long _allowedGroupId;
     private readonly bool _disabled = false;
@@ -40,7 +41,7 @@ public class Bot
             return;
         }
 
-        var msg = "‼️ Игроки в бане на КВ ‼️\n";
+        var msg = "‼️ Этих игроков <strong>не брать</strong> на КВ ‼️\n";
 
         for (var i = 0; i < banlist.Count; i++)
         {
@@ -69,7 +70,7 @@ public class Bot
             return;
         }
 
-        var clan = await ClashApi.GetClan("#2JYQJYVJ8");
+        var clan = await _clash.GetClan("#2JYQJYVJ8");
         if (clan == null)
         {
             await Client.SendMessage(chat, "❌ Ошибка введения бана на этапе обработки участников клана.");
@@ -124,7 +125,7 @@ public class Bot
         }
 
 
-        var player = await ClashApi.GetPlayer(tag);
+        var player = await _clash.GetPlayer(tag);
         var file = "cwbanlist.txt";
 
         if (player == null)
@@ -212,8 +213,8 @@ public class Bot
         }
 
 
-        var p = await ClashApi.GetPlayer(player!.Player.tag);
-        var ms = await ClashApi.GetMembers("#2JYQJYVJ8");
+        var p = await _clash.GetPlayer(player!.Player.tag);
+        var ms = await _clash.GetMembers("#2JYQJYVJ8");
 
         if (p == null)
         {
@@ -243,7 +244,7 @@ public class Bot
                 .ToList();
         }
 
-        var members = await ClashApi.GetMembers("#2JYQJYVJ8");
+        var members = await _clash.GetMembers("#2JYQJYVJ8");
 
         if (members == null || members.items == null)
         {
@@ -306,6 +307,7 @@ public class Bot
 
     async Task RequestAuth(ChatId chat, User user, bool welcome = false)
     {
+        if (!_authStartHashes.ContainsKey(user.Id)) { _authStartHashes.Add(user.Id, GenerateRandomString(6)); }
         string message = welcome ?
             $"""
             Добро пожаловать, @{user.Username}!
@@ -369,7 +371,7 @@ public class Bot
         {
             string gameTag = replyMessage.Text!;
 
-            var player = await ClashApi.GetPlayer(gameTag);
+            var player = await _clash.GetPlayer(gameTag);
 
             if (player == null)
             {
@@ -401,7 +403,7 @@ public class Bot
         {
             string gameToken = replyMessage.Text!;
 
-            var verified = await ClashApi.ValidatePlayer(_authPlayersStorage[user.Id].tag, gameToken);
+            var verified = await _clash.ValidatePlayer(_authPlayersStorage[user.Id].tag, gameToken);
 
             if (verified == null)
             {
@@ -492,7 +494,6 @@ public class Bot
                     );
                 break;
             case "/verify":
-                if (!_authStartHashes.ContainsKey(msg!.From!.Id)) { _authStartHashes.Add(msg.From!.Id, GenerateRandomString(6)); }
                 await RequestAuth(msg.Chat, msg.From!);
                 break;
             case "/members":
@@ -582,7 +583,7 @@ public class Bot
             if (int.TryParse(pageSwitch[0], out int target) && int.TryParse(pageSwitch[1], out int current) &&
                 target != current)
             {
-                var members = await ClashApi.GetMembers("#2JYQJYVJ8");
+                var members = await _clash.GetMembers("#2JYQJYVJ8");
                 if (members == null) return;
 
                 var newText = FormatMembersPage(members.items, target, 5);
@@ -600,12 +601,12 @@ public class Bot
             }
         }
 
-        if (update.Type == UpdateType.ChatJoinRequest)
+        if (update.Type == UpdateType.Message && update.Message!.Text == null && update.Message!.NewChatMembers != null)
         {
-            var newUser = update.ChatJoinRequest!.From;
-            var chat = update.ChatJoinRequest.Chat;
-
-            await RequestAuth(chat, newUser, true);
+            foreach (var user in update.Message!.NewChatMembers)
+            {
+                await RequestAuth(update.Message!.Chat, user, true);
+            }
         }
     }
 
@@ -620,14 +621,15 @@ public class Bot
         }
         return res.ToString();
     }
-    public Bot(string token)
+    public Bot(string TgToken, string CocToken)
     {
         _authPlayersStorage = new();
         _authStartHashes = new();
         _authSeqSteps = new();
 
         Cts = new CancellationTokenSource();
-        Client = new TelegramBotClient(token);
+        Client = new TelegramBotClient(TgToken);
+        _clash = new ClashApi(CocToken);
 
         Client.DeleteWebhook().Wait();
         Client.DropPendingUpdates().Wait();

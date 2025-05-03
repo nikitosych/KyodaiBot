@@ -1,5 +1,4 @@
-﻿using KyodaiBot.Models;
-using System.Timers;
+﻿using System.Timers;
 
 namespace KyodaiBot
 {
