@@ -6,12 +6,11 @@ namespace KyodaiBot
 {
     public class Watchdog
     {
+        private readonly ClashApi _clash;
         private readonly System.Timers.Timer _timer;
         private readonly string _banFile = "cwbanlist.txt";
         private DateTime _lastRaidEventDate = DateTime.MinValue;
-        private ClashApi _clash;
-
-        private string _clanTag;
+        private readonly string _clanTag;
 
         public Watchdog(ref ClashApi clash, string clanTag, double intervalMs = 60000)
         {
@@ -20,6 +19,7 @@ namespace KyodaiBot
             _timer = new System.Timers.Timer(intervalMs);
 
             _timer.Elapsed += CheckBans;
+            _timer.Elapsed += CheckWarPreparation;
             _timer.Elapsed += CheckRaid;
 
             _timer.AutoReset = true;
@@ -36,20 +36,27 @@ namespace KyodaiBot
             _timer.Stop();
         }
 
-        private async Task CheckWarPreparation(object? sender, ElapsedEventArgs? e)
+        private async void CheckWarPreparation(object? sender, ElapsedEventArgs? e)
         {
-            // ReSharper disable once StringLiteralTypo
-            var war = await _clash.Get<CurrentWar>($"/clans/{_clanTag}/currentwar");
+            try
+            {
+                // ReSharper disable once StringLiteralTypo
+                var war = await _clash.Get<CurrentWar>($"/clans/{_clanTag}/currentwar");
 
-            if (war == null)
-            {
-                Console.WriteLine("[Watchdog] Ошибка при получении информации о войне.");
-                return;
+                if (war == null)
+                {
+                    Console.WriteLine("[Watchdog] Ошибка при получении информации о войне.");
+                    return;
+                }
+                if (war.state == WarState.PREPARATION)
+                {
+                    Console.WriteLine("[Watchdog] Началась подготовка к войне!");
+                    WatchdogEvents.OnWarPreparationStarted(war);
+                }
             }
-            if (war.state == WarState.PREPARATION)
+            catch (Exception ex)
             {
-                Console.WriteLine("[Watchdog] Началась подготовка к войне!");
-                WatchdogEvents.OnWarPreparationStarted(war);
+                Console.WriteLine($"[Watchdog] Ошибка при проверке войны: {ex.Message}");
             }
         }
 
