@@ -38,10 +38,17 @@ namespace KyodaiBot
 
         private async void CheckWarPreparation(object? sender, ElapsedEventArgs? e)
         {
+            var filename = "currentwar.txt";
             try
             {
                 // ReSharper disable once StringLiteralTypo
-                var war = await _clash.Get<CurrentWar>($"/clans/{_clanTag}/currentwar");
+                var war = await _clash.GetCurrentWar(_clanTag);
+
+                var cached = Saver.Load<CurrentWar>(filename);
+
+                if (cached != null && cached.opponent.name == war.opponent.name)
+                    return;
+                Saver.Save(war, filename);
 
                 if (war == null)
                 {

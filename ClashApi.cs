@@ -1,6 +1,8 @@
 ﻿using System.Text;
 using KyodaiBot.Models;
+using KyodaiBot.Models.CurrentWar;
 using Newtonsoft.Json;
+using Clan = KyodaiBot.Models.Clan;
 
 namespace KyodaiBot;
 
@@ -33,6 +35,17 @@ public sealed class ClashApi(string token)
         return await Get<Player>($"{BaseUrl}/players/{encodedTag}");
     }
 
+    public async Task<WarLog?> GetWarLog(string clanTag)
+    {
+        string encodedTag = Uri.EscapeDataString(clanTag);
+        return await Get<WarLog>($"{BaseUrl}/clans/{encodedTag}/warlog");
+    }
+
+    public async Task<CurrentWar?> GetCurrentWar(string clanTag)
+    {
+        string encodedTag = Uri.EscapeDataString(clanTag);
+        return await Get<CurrentWar>($"{BaseUrl}/clans/{encodedTag}/currentwar");
+    }
 
     public async Task<T?> Get<T>(string endpoint)
     {
