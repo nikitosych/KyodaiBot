@@ -34,7 +34,7 @@ public sealed class ClashApi(string token)
     }
 
 
-    private async Task<T?> Get<T>(string endpoint)
+    public async Task<T?> Get<T>(string endpoint)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
         request.Headers.Add("Authorization", $"Bearer {token}");
