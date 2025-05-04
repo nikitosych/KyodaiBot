@@ -1,4 +1,6 @@
-﻿namespace KyodaiBot.Models.CurrentWar; // приходится юзать отдельный неймспейс так как api возвращает Clan.members разных типов в зависимости от запроса
+﻿using KyodaiBot.Models.Base;
+
+namespace KyodaiBot.Models.CurrentWar; // приходится юзать отдельный неймспейс так как api возвращает Clan.members разных типов в зависимости от запроса
 
 public class BadgeUrls
 {
@@ -40,7 +42,7 @@ public class Opponent
     public List<Member> members { get; set; }
 }
 
-public class CurrentWar
+public class CurrentWar : Response
 {
     public WarState state { get; set; }
     public int? teamSize { get; set; }

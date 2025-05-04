@@ -1,6 +1,5 @@
 ﻿using System.Text;
 using KyodaiBot.Models;
-using KyodaiBot.Models.CurrentWar;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
@@ -29,7 +28,6 @@ public class Bot
     private delegate Task CwBanHandler(ChatId chatId);
 
     private event CwBanHandler CwBanned;
-
 
     public async Task ListBans(ChatId chatId)
     {
@@ -63,6 +61,119 @@ public class Bot
         );
     }
 
+    public async Task Warn(ChatId chat, long authorId, string tag, string reason)
+    {
+        if (Saver.TryGetUser(authorId, out var author) == false)
+        {
+            await Client.SendMessage(chat, "❌ Ошибка: Вы не верифицированы. Пройдите верификацию командой /verify.");
+            return;
+        }
+
+        var clan = await _clash.GetClan(_defaultClanTag);
+        if (clan == null)
+        {
+            await Client.SendMessage(chat, "❌ Ошибка вынесения палки на этапе обработки участников клана.");
+            return;
+        }
+
+        var authorRole = clan.memberList.Find(m => m.tag == author!.Player.tag)!.role;
+        if (authorRole is not (Models.Roles.LEADER or Models.Roles.COLEADER))
+        {
+            await Client.SendMessage(chat, "❌ Ошибка: Вы не имеете прав на вынесение палки. Вам нужна роль \"Глава\" или \"Соруководитель\".");
+            return;
+        }
+        if (string.IsNullOrEmpty(tag) || tag.Length > 11)
+        {
+            await Client.SendMessage(chat, "❌ Ошибка вынесения палки на этапе обработки тега игрока. Тег не может быть пустым или превышать 10 символов");
+            return;
+        }
+        if (tag[0] != '#')
+        {
+            tag = "#" + tag;
+        }
+        var player = await _clash.GetPlayer(tag);
+        if (player == null)
+        {
+            await Client.SendMessage(chat, "❌ Ошибка: Не удалось обработать профиль игрока.");
+            return;
+        }
+        Saver.AddWarn(player, reason);
+        await Client.SendMessage(chat, "✅ Успешно вынесена палка.");
+    }
+    public async Task Unwarn(ChatId chat, long authorId, string tag)
+    {
+        if (Saver.TryGetUser(authorId, out var author) == false)
+        {
+            await Client.SendMessage(chat, "❌ Ошибка: Вы не верифицированы. Пройдите верификацию командой /verify.");
+            return;
+        }
+        var clan = await _clash.GetClan(_defaultClanTag);
+        if (clan == null)
+        {
+            await Client.SendMessage(chat, "❌ Ошибка снятия палки на этапе обработки участников клана.");
+            return;
+        }
+        var authorRole = clan.memberList.Find(m => m.tag == author!.Player.tag)!.role;
+        if (authorRole is not (Models.Roles.LEADER or Models.Roles.COLEADER))
+        {
+            await Client.SendMessage(chat, "❌ Ошибка: Вы не имеете прав на снятие палки. Вам нужна роль \"Глава\" или \"Соруководитель\".");
+            return;
+        }
+        if (string.IsNullOrEmpty(tag) || tag.Length > 11)
+        {
+            await Client.SendMessage(chat, "❌ Ошибка снятия палки на этапе обработки тега игрока. Тег не может быть пустым или превышать 10 символов");
+            return;
+        }
+        if (tag[0] != '#')
+        {
+            tag = "#" + tag;
+        }
+        var player = await _clash.GetPlayer(tag);
+        if (player == null)
+        {
+            await Client.SendMessage(chat, "❌ Ошибка: Не удалось обработать профиль игрока.");
+            return;
+        }
+        Saver.RemoveWarn(player);
+        await Client.SendMessage(chat, "✅ Палка успешно снята.");
+    }
+
+    public async Task ListWarns(ChatId chat)
+    {
+        var warns = Saver.GetWarnings();
+        if (warns == null) return;
+        if (warns.Count == 0)
+        {
+            await Client.SendMessage(chat, "✅ Игроков с предупреждениями нету.");
+            return;
+        }
+        var msg = "‼️ Этим игрокам вынесены палки ‼️\n<i>за 3 палки можно исключать игрока из клана</i>\n";
+        for (var i = 0; i < warns.Count; i++)
+        {
+            var warn = warns[i];
+            msg += $"""
+                    {i + 1}.
+                    <strong>Имя:</strong> {warn.Player.name} ({warn.Player.tag}),
+                    <strong>Палки:</strong>
+                    """;
+            for (var j = 0; j < warn.Warnings.Count; j++)
+            {
+                var w = warn.Warnings[j];
+                msg += $"""
+                        {j + 1}. {w.Reason} ({w.Date:dd.MM.yyyy})
+                        """;
+            }
+            if (warn.Warnings.Count >= 3)
+            {
+                msg += "🚪 <i>Этого игрока можно исключать из клана</i>";
+            }
+        }
+        await Client.SendMessage(
+            chat,
+            msg,
+            Telegram.Bot.Types.Enums.ParseMode.Html
+        );
+    }
     public async Task CwBan(ChatId chat, long authorId, string tag, int? days, bool unban = false, string? reason = null)
     {
         if (Saver.TryGetUser(authorId, out var author) == false)
@@ -240,8 +351,7 @@ public class Bot
 
             return items
                 .Where(m => roleOrder.Contains(m.role))
-                .OrderBy(m => roleOrder.IndexOf(m.role))
-                .ThenByDescending(m => m.trophies)
+                .OrderByDescending(m => m.trophies)
                 .ToList();
         }
 
@@ -483,6 +593,9 @@ public class Bot
                     /cwban - Забанить игрока от участия в КВ: Использование /cwban <тег> <дни> <причина>
                     /cwunban - Разбанить игрока от участия в КВ: Использование /cwunban <тег>
                     /banlist - Вывести список забаненных игроков от участия в КВ
+                    /warn - Выдать предупреждение игроку: Использование /warn <тег> <причина>
+                    /unwarn - Снять предупреждение игроку: Использование /unwarn <тег>
+                    /listwarns - Вывести список игроков с предупреждениями
                     
                     Вот что я скоро буду уметь:
                     /rank - Система рейтингов и отслеживания активности игроков
@@ -537,6 +650,40 @@ public class Bot
                 break;
             case "/banlist":
                 await ListBans(msg.Chat);
+                break;
+            case "/warn":
+                if (args == "")
+                {
+                    await Client.SendMessage(msg.Chat, "❌ Ошибка: Не указаны аргументы команды.");
+                    return;
+                }
+                var argsSplitWarn = args.Split(" ");
+                if (argsSplitWarn.Length < 2)
+                {
+                    await Client.SendMessage(msg.Chat, "❌ Ошибка: Не указаны аргументы команды.");
+                    return;
+                }
+                var tagWarn = argsSplitWarn[0];
+                var reasonWarn = string.Join(" ", argsSplitWarn.Skip(1));
+                await Warn(msg.Chat, msg.From!.Id, tagWarn, reasonWarn);
+                break;
+            case "/unwarn":
+                if (args == "")
+                {
+                    await Client.SendMessage(msg.Chat, "❌ Ошибка: Не указаны аргументы команды.");
+                    return;
+                }
+                var argsSplitUnwarn = args.Split(" ");
+                if (argsSplitUnwarn.Length < 1)
+                {
+                    await Client.SendMessage(msg.Chat, "❌ Ошибка: Не указаны аргументы команды.");
+                    return;
+                }
+                var tagUnwarn = argsSplitUnwarn[0];
+                await Unwarn(msg.Chat, msg.From!.Id, tagUnwarn);
+                break;
+            case "/listwarns":
+                await ListWarns(msg.Chat);
                 break;
         }
     }

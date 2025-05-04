@@ -1,4 +1,6 @@
-﻿namespace KyodaiBot.Models;
+﻿using KyodaiBot.Models.Base;
+
+namespace KyodaiBot.Models;
 
 // WarLog myDeserializedClass = JsonConvert.DeserializeObject<WarLog>(myJsonResponse);
 public partial class BadgeUrls

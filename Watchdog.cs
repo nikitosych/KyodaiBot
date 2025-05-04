@@ -1,6 +1,6 @@
 ﻿using System.Timers;
-using KyodaiBot.Models;
 using KyodaiBot.Models.CurrentWar;
+using KyodaiBot.Models.LeagueGroup;
 
 namespace KyodaiBot
 {
@@ -36,18 +36,57 @@ namespace KyodaiBot
             _timer.Stop();
         }
 
-        private async void CheckWarPreparation(object? sender, ElapsedEventArgs? e)
+        private async void CheckCWL(object? sender, ElapsedEventArgs? e)
         {
-            var filename = "currentwar.txt";
             try
             {
                 // ReSharper disable once StringLiteralTypo
+                const string filename = "currentcwl.txt";
+                var leagueGroup = await _clash.GetLeagueGroup(_clanTag);
+
+                var cached = Saver.Load<LeagueGroup>(filename);
+
+                if (leagueGroup != null && leagueGroup.clans[0].tag == cached.clans[0].tag)
+                    return;
+                
+
+                if (leagueGroup == null)
+                {
+                    Console.WriteLine("[Watchdog] Ошибка при получении информации о Лиге Кланов.");
+                    return;
+                }
+                if (leagueGroup.state == LeagueState.PREPARATION)
+                {
+                    Console.WriteLine("[Watchdog] Началась подготовка к ЛВК!");
+                }
+                if (leagueGroup.state == LeagueState.WAR)
+                {
+                    Console.WriteLine("[Watchdog] Началась Лига Кланов!");
+                    WatchdogEvents.OnCWLStarted(leagueGroup);
+                }
+
+                Saver.Clear(filename);
+                Saver.Save(leagueGroup, filename);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Watchdog] Ошибка при проверке Лиги Кланов: {ex.Message}");
+            }
+        }
+
+        private async void CheckWarPreparation(object? sender, ElapsedEventArgs? e)
+        {
+            try
+            {
+                // ReSharper disable once StringLiteralTypo
+                const string filename = "currentwar.txt";
                 var war = await _clash.GetCurrentWar(_clanTag);
 
                 var cached = Saver.Load<CurrentWar>(filename);
 
-                if (cached != null && cached.opponent.name == war.opponent.name)
+                if (cached != null && cached.opponent.tag == war?.opponent.tag)
                     return;
+                Saver.Clear(filename);
                 Saver.Save(war, filename);
 
                 if (war == null)
@@ -125,6 +164,13 @@ namespace KyodaiBot
         public static void OnWarPreparationStarted(CurrentWar war)
         {
             WarPreparationStartedEvent?.Invoke(war);
+        }
+
+        public delegate void CWLStarted(LeagueGroup leagueGroup);
+        public static event CWLStarted? CWLStartedEvent;
+        public static void OnCWLStarted(LeagueGroup leagueGroup)
+        {
+            CWLStartedEvent?.Invoke(leagueGroup);
         }
     }
 }

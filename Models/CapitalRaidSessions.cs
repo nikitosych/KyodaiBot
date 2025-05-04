@@ -1,4 +1,7 @@
 ﻿// Root myDeserializedClass = JsonConvert.DeserializeObject<Root>(myJsonResponse);
+
+using KyodaiBot.Models.Base;
+
 namespace KyodaiBot.Models;
 public class Attack
 {

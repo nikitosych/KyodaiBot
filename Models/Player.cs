@@ -1,4 +1,6 @@
-﻿namespace KyodaiBot.Models;
+﻿using KyodaiBot.Models.Base;
+
+namespace KyodaiBot.Models;
 
 // Root myDeserializedClass = JsonConvert.DeserializeObject<Root>(myJsonResponse);
 public class Achievement

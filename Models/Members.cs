@@ -1,4 +1,6 @@
-﻿namespace KyodaiBot.Models;
+﻿using KyodaiBot.Models.Base;
+
+namespace KyodaiBot.Models;
 
 public partial class BuilderBaseLeague
 {

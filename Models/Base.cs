@@ -1,4 +1,4 @@
-﻿namespace KyodaiBot.Models;
+﻿namespace KyodaiBot.Models.Base;
 
 public class Response
 {
