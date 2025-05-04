@@ -147,25 +147,26 @@ public class Bot
             await Client.SendMessage(chat, "✅ Игроков с предупреждениями нету.");
             return;
         }
-        var msg = "‼️ Этим игрокам вынесены палки ‼️\n<i>за 3 палки можно исключать игрока из клана</i>\n";
+        var msg = "‼️ Этим игрокам вынесены палки\n<i>(3 палки -> до свидания)</i>\n";
         for (var i = 0; i < warns.Count; i++)
         {
             var warn = warns[i];
             msg += $"""
-                    {i + 1}.
-                    <strong>Имя:</strong> {warn.Player.name} ({warn.Player.tag}),
+                    {i + 1}. {warn.Player.name} ({warn.Player.tag}),
                     <strong>Палки:</strong>
+                    
                     """;
             for (var j = 0; j < warn.Warnings.Count; j++)
             {
                 var w = warn.Warnings[j];
                 msg += $"""
                         {j + 1}. {w.Reason} ({w.Date:dd.MM.yyyy})
+                        
                         """;
             }
             if (warn.Warnings.Count >= 3)
             {
-                msg += "🚪 <i>Этого игрока можно исключать из клана</i>";
+                msg += "\n🚪 <i>Этого игрока можно исключать из клана</i>";
             }
         }
         await Client.SendMessage(
@@ -307,10 +308,10 @@ public class Bot
     }
     private static readonly Dictionary<Roles, string> Roles = new()
     {
-        { Models.Roles.LEADER, "Голова 🏰" },
-        { Models.Roles.COLEADER, "Соруководитель 🛡️" },
-        { Models.Roles.ADMIN, "Старейшина 💪" },
-        { Models.Roles.MEMBER, "Соклановец ⚔️" },
+        { Models.Roles.LEADER, "Глава" },
+        { Models.Roles.COLEADER, "Соруководитель" },
+        { Models.Roles.ADMIN, "Старейшина" },
+        { Models.Roles.MEMBER, "Соклановец" },
         { Models.Roles.NOT_MEMBER, "???" }
     };
     public async Task SendMemberProfile(ChatId chat, User user)
