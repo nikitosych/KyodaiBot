@@ -44,7 +44,7 @@ public class Opponent
 
 public class CurrentWar : Response
 {
-    public WarState state { get; set; }
+    public string state { get; set; }
     public int? teamSize { get; set; }
     public int? attacksPerMember { get; set; }
     public string battleModifier { get; set; }
@@ -53,18 +53,4 @@ public class CurrentWar : Response
     public string endTime { get; set; }
     public Clan clan { get; set; }
     public Opponent opponent { get; set; }
-}
-
-public enum WarState
-{
-    CLAN_NOT_FOUND, 
-    ACCESS_DENIED, 
-    NOT_IN_WAR, 
-    IN_MATCHMAKING, 
-    ENTER_WAR, 
-    MATCHED, 
-    PREPARATION, 
-    WAR, 
-    IN_WAR, 
-    ENDED
 }

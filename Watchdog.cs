@@ -94,11 +94,12 @@ namespace KyodaiBot
                     Console.WriteLine("[Watchdog] Ошибка при получении информации о войне.");
                     return;
                 }
-                if (war.state == WarState.PREPARATION)
+                if (war.state == "preparation")
                 {
                     Console.WriteLine("[Watchdog] Началась подготовка к войне!");
                     WatchdogEvents.OnWarPreparationStarted(war);
                 }
+                Console.WriteLine($"[Watchdog] Началась война с {war.opponent.name} ({war.opponent.tag}) - {war.state}");
             }
             catch (Exception ex)
             {
