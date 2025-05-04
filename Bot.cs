@@ -374,8 +374,6 @@ public class Bot
 
         await Client.SendMessage(chat, message, parseMode: ParseMode.Html, replyMarkup: keyboard);
     }
-
-
     string FormatMembersPage(List<Item> members, int page, int pageSize)
     {
         int start = (page - 1) * pageSize;
@@ -399,8 +397,6 @@ public class Bot
 
         return sb.ToString();
     }
-
-
     InlineKeyboardMarkup GeneratePageKeyboard(int currentPage, int totalPages)
     {
         var buttons = new List<InlineKeyboardButton[]>();
@@ -414,7 +410,6 @@ public class Bot
         buttons.Add(row.ToArray());
         return new InlineKeyboardMarkup(buttons);
     }
-
 
     async Task RequestAuth(ChatId chat, User user, bool welcome = false)
     {
@@ -539,6 +534,19 @@ public class Bot
 
             await Client.SendMessage(chatId, messages[2]);
             Saver.AddUser(new VerifiedUser(user, _authPlayersStorage[user.Id]));
+
+            Console.WriteLine($"[Auth] User {user.Username} ({user.Id}) verified with tag {_authPlayersStorage[user.Id].tag}");
+
+            await Client.PromoteChatMember(_allowedGroupId, user.Id, false, false, false, false, false, false, false,
+                false, false, false, false, false, true, false, false);
+
+            Console.WriteLine($"[Auth] User {user.Username} ({user.Id}) promoted to member in group {_allowedGroupId}");
+
+
+            var pn = authedUser?.Player.name;
+
+            if (pn != null)
+                await Client.SetChatAdministratorCustomTitle(_allowedGroupId, user.Id, pn);
 
             rem(user.Id);
         }
