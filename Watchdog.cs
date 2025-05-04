@@ -1,4 +1,6 @@
 ﻿using System.Timers;
+using KyodaiBot.Models;
+using KyodaiBot.Models.CurrentWar;
 
 namespace KyodaiBot
 {
@@ -6,11 +8,20 @@ namespace KyodaiBot
     {
         private readonly System.Timers.Timer _timer;
         private readonly string _banFile = "cwbanlist.txt";
+        private DateTime _lastRaidEventDate = DateTime.MinValue;
+        private ClashApi _clash;
 
-        public Watchdog(double intervalMs = 60000) // по умолчанию проверка каждую минуту
+        private string _clanTag;
+
+        public Watchdog(ref ClashApi clash, string clanTag, double intervalMs = 60000)
         {
+            _clash = clash;
+            _clanTag = clanTag;
             _timer = new System.Timers.Timer(intervalMs);
-            _timer.Elapsed += OnCheck;
+
+            _timer.Elapsed += CheckBans;
+            _timer.Elapsed += CheckRaid;
+
             _timer.AutoReset = true;
         }
 
@@ -25,7 +36,38 @@ namespace KyodaiBot
             _timer.Stop();
         }
 
-        private void OnCheck(object? sender, ElapsedEventArgs e)
+        private async Task CheckWarPreparation(object? sender, ElapsedEventArgs? e)
+        {
+            // ReSharper disable once StringLiteralTypo
+            var war = await _clash.Get<CurrentWar>($"/clans/{_clanTag}/currentwar");
+
+            if (war == null)
+            {
+                Console.WriteLine("[Watchdog] Ошибка при получении информации о войне.");
+                return;
+            }
+            if (war.state == WarState.PREPARATION)
+            {
+                Console.WriteLine("[Watchdog] Началась подготовка к войне!");
+                WatchdogEvents.OnWarPreparationStarted(war);
+            }
+        }
+
+        private void CheckRaid(object? sender, ElapsedEventArgs? e)
+        {
+            DateTime utcNow = DateTime.UtcNow;
+
+            if (utcNow.DayOfWeek == DayOfWeek.Friday &&
+                utcNow.Hour == 7 && utcNow.Minute == 0 &&
+                _lastRaidEventDate.Date != utcNow.Date)
+            {
+                _lastRaidEventDate = utcNow.Date;
+                Console.WriteLine($"[Watchdog] Открыта сессия рейдов! (Последний раз было: {_lastRaidEventDate:yy-MMM-dd ddd})");
+                WatchdogEvents.OnCapitalRaidStarted();
+            }
+        }
+
+        private void CheckBans(object? sender, ElapsedEventArgs? e)
         {
             try
             {
@@ -46,15 +88,29 @@ namespace KyodaiBot
                     }
 
                     Saver.Save(banlist, _banFile);
-
-                    // Можно также вызвать обновление Telegram-сообщения о банах
-                    // Например: await CwBanned?.Invoke(...); если в асинхронном контексте
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[Watchdog] Ошибка при проверке банов: {ex.Message}");
             }
+        }
+    }
+
+    static class WatchdogEvents
+    {
+        public delegate void CapitalRaidStarted();
+        public static event CapitalRaidStarted? CapitalRaidStartedEvent;
+        public static void OnCapitalRaidStarted()
+        {
+            CapitalRaidStartedEvent?.Invoke();
+        }
+
+        public delegate void WarPreparationStarted(CurrentWar war);
+        public static event WarPreparationStarted? WarPreparationStartedEvent;
+        public static void OnWarPreparationStarted(CurrentWar war)
+        {
+            WarPreparationStartedEvent?.Invoke(war);
         }
     }
 }

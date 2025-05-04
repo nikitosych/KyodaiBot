@@ -4,14 +4,17 @@ internal class Program
 {
     public static async Task<int> Main(string[] args) // ← Обязательно async Task<int>
     {
+        string ourClanTag = "#2JYQJYVJ8"; // Kyodai
+
         string? explicitTgToken = null;
         string? explicitCocToken = null;
 
-        string actualTgToken = explicitTgToken ?? Environment.GetEnvironmentVariable("TELEGRAM_API_TOKEN")!;
-        string actualCocToken = explicitCocToken ?? Environment.GetEnvironmentVariable("CLASH_API_TOKEN")!;
+        var actualTgToken = explicitTgToken ?? Environment.GetEnvironmentVariable("TELEGRAM_API_TOKEN")!;
+        var actualCocToken = explicitCocToken ?? Environment.GetEnvironmentVariable("CLASH_API_TOKEN")!;
 
-        var bot = new Bot(actualTgToken, actualCocToken);
-        var watchdog = new Watchdog();
+        var clash = new ClashApi(actualCocToken);
+        var bot = new Bot(actualTgToken, actualCocToken, ref clash, ourClanTag);
+        var watchdog = new Watchdog(ref clash, ourClanTag, 90000);
 
         Console.WriteLine($"@{bot.Me.Username} is running... Press Ctrl+C to terminate");
 

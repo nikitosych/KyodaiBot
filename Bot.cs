@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using KyodaiBot.Models;
+using KyodaiBot.Models.CurrentWar;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
@@ -19,7 +20,7 @@ public class Bot
     private readonly ClashApi _clash;
 
     private readonly long _allowedGroupId;
-    private readonly bool _disabled = false;
+    private readonly string _defaultClanTag;
 
     private readonly Dictionary<long, string> _authStartHashes;
     private readonly Dictionary<long, Player> _authPlayersStorage;
@@ -70,7 +71,7 @@ public class Bot
             return;
         }
 
-        var clan = await _clash.GetClan("#2JYQJYVJ8");
+        var clan = await _clash.GetClan(_defaultClanTag);
         if (clan == null)
         {
             await Client.SendMessage(chat, "❌ Ошибка введения бана на этапе обработки участников клана.");
@@ -214,7 +215,7 @@ public class Bot
 
 
         var p = await _clash.GetPlayer(player!.Player.tag);
-        var ms = await _clash.GetMembers("#2JYQJYVJ8");
+        var ms = await _clash.GetMembers(_defaultClanTag);
 
         if (p == null)
         {
@@ -225,7 +226,7 @@ public class Bot
                                          @{user.Username}, вот твоя игровая информация:
                                          <strong>Имя:</strong> {p.name} ({p.tag}),
                                          <strong>Подтвержден:</strong> {(Saver.LoadUsers().Exists(u => u.Player.tag == p.tag) ? "✅" : "❌")},
-                                         <strong>Клан:</strong> {p.clan.name} {(p.clan.tag == "#2JYQJYVJ8" ? "🏰" : "(Чужой)")},
+                                         <strong>Клан:</strong> {p.clan.name} {(p.clan.tag == _defaultClanTag ? "🏰" : "(Чужой)")},
                                          {(ms != null && ms.items.Exists(m => m.tag == p.tag) ? $"<strong>Роль:</strong> {Roles[ms.items.Find(m => m.tag == p.tag)!.role]}" : "")},
                                           <strong>ТХ:</strong> {p.townHallLevel}, <strong>Уровень:</strong> {p.expLevel}, 
                                           <strong>Кубки:</strong> {p.trophies} 🏆
@@ -244,7 +245,7 @@ public class Bot
                 .ToList();
         }
 
-        var members = await _clash.GetMembers("#2JYQJYVJ8");
+        var members = await _clash.GetMembers(_defaultClanTag);
 
         if (members == null || members.items == null)
         {
@@ -388,7 +389,7 @@ public class Bot
                 return;
             }
 
-            if (player.clan.tag != "#2JYQJYVJ8")
+            if (player.clan.tag != _defaultClanTag)
             {
                 await Client.SendMessage(chatId,
                     $"❌ Чтобы продолжить, вы должны быть в нашем клане (тег: #2JYQJYVJ8)\nТекущий клан: {player.clan.name}");
@@ -583,7 +584,7 @@ public class Bot
             if (int.TryParse(pageSwitch[0], out int target) && int.TryParse(pageSwitch[1], out int current) &&
                 target != current)
             {
-                var members = await _clash.GetMembers("#2JYQJYVJ8");
+                var members = await _clash.GetMembers(_defaultClanTag);
                 if (members == null) return;
 
                 var newText = FormatMembersPage(members.items, target, 5);
@@ -621,7 +622,7 @@ public class Bot
         }
         return res.ToString();
     }
-    public Bot(string TgToken, string CocToken)
+    public Bot(string TgToken, string CocToken, ref ClashApi clashApi, string defaultClanTag)
     {
         _authPlayersStorage = new();
         _authStartHashes = new();
@@ -629,7 +630,9 @@ public class Bot
 
         Cts = new CancellationTokenSource();
         Client = new TelegramBotClient(TgToken);
-        _clash = new ClashApi(CocToken);
+        _clash = clashApi;
+
+        _defaultClanTag = defaultClanTag;
 
         Client.DeleteWebhook().Wait();
         Client.DropPendingUpdates().Wait();
@@ -651,7 +654,40 @@ public class Bot
             cancellationToken: Cts.Token
         );
 
-        CwBanned += async (ChatId chatId) => await ListBans(chatId);
+        // ПОДПИСКИ
+
+        CwBanned += async chatId => await ListBans(chatId);
+
+        WatchdogEvents.WarPreparationStartedEvent += async war =>
+        {
+            var msg = "📣 Началась подготовка к войне!\n";
+
+            msg += $"""
+                    ⚔️ <strong>Противник:</strong> {war.opponent.name} - {war.opponent.clanLevel} ур. (<span class="tg-spoiler"><code>{war.opponent.tag}</code></span>),
+                    🟫 <strong>Поле:</strong> {war.teamSize}v{war.teamSize},
+                    🪖 <strong>Манифест:</strong> <i>{war.attacksPerMember} атак на участника</i>,
+                    
+                    """;
+
+            for (int i = 0; i < war.teamSize; i++)
+            {
+                var our = war.clan.members.FirstOrDefault(m => m.mapPosition == i);
+                var their = war.opponent.members.FirstOrDefault(m => m.mapPosition == i);
+                msg +=
+                    $"{i + 1}. {our?.name} ({our?.townhallLevel} тх.) vs. {their?.name} ({their?.townhallLevel} тх.)\n";
+            }
+
+            msg += "🤜🤛 Удачи!";
+
+            await Client.SendMessage(_allowedGroupId, msg, ParseMode.Html);
+            Console.WriteLine($"Обработан ивент WarPreparationStartedEvent: {msg}");
+        };
+
+        WatchdogEvents.CapitalRaidStartedEvent += async () =>
+        {
+            await Client.SendMessage(_allowedGroupId, "⚔️ Пятница - открыта сессия рейдов!");
+            Console.WriteLine($"Обработан ивент CapitalRaidStartedEvent");
+        };
     }
 
     private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)

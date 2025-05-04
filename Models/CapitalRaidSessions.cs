@@ -77,7 +77,7 @@ public partial class Item
     public List<DefenseLog> defenseLog { get; set; }
 }
 
-public class Member
+public partial class Member
 {
     public string tag { get; set; }
     public string name { get; set; }
