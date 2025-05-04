@@ -1,6 +1,5 @@
 ﻿namespace KyodaiBot.Models;
 
-// Root myDeserializedClass = JsonConvert.DeserializeObject<Root>(myJsonResponse);
 public partial class BuilderBaseLeague
 {
     public int id { get; set; }
@@ -68,7 +67,7 @@ public partial class PlayerHouse
     public List<Element> elements { get; set; }
 }
 
-public class Members : Response
+public partial class Members : Response
 {
     public List<Item> items { get; set; }
     public Paging paging { get; set; }
